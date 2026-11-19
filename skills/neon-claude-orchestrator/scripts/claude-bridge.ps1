@@ -31,6 +31,12 @@ if (-not (Test-Path $orchDir)) {
     New-Item -ItemType Directory -Path $orchDir -Force | Out-Null
 }
 
+# Logs contain full prompts and replies: keep them out of the project's git history by default
+$orchGitignore = Join-Path $orchDir ".gitignore"
+if (-not (Test-Path $orchGitignore)) {
+    Set-Content -Path $orchGitignore -Value "*" -Encoding ASCII
+}
+
 $logFile = Join-Path $orchDir "comm_log.jsonl"
 $jsDataFile = Join-Path $orchDir "dashboard_data.js"
 
@@ -49,10 +55,16 @@ if (-not [string]::IsNullOrWhiteSpace($ResumeSessionId)) {
 }
 
 if ($ReadOnly) {
-    $cliArgs += @("--allowedTools", "Read,Grep,Glob,LS")
+    # --tools limits which built-in tools exist at all (--allowedTools alone only pre-approves them,
+    # so user settings that allow Edit/Bash would still apply). --strict-mcp-config drops MCP servers,
+    # whose tools could also write.
+    $readOnlyTools = "Read,Grep,Glob"
+    $cliArgs += @("--tools", $readOnlyTools, "--allowedTools", $readOnlyTools, "--strict-mcp-config")
 }
 
-# Resolve unmodified official Claude Code binary (prefer direct .exe to avoid wrapper stderr noise)
+# Resolve unmodified official Claude Code binary.
+# Only a real .exe is accepted: .cmd/.bat wrappers are run through cmd.exe, whose quoting rules differ
+# from the escaping below, so a crafted prompt could inject shell commands.
 $claudeExe = $null
 $candidatePaths = @(
     (Join-Path $env:APPDATA "npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe"),
@@ -67,17 +79,16 @@ foreach ($cand in $candidatePaths) {
 }
 
 if (-not $claudeExe) {
-    $claudeCmd = Get-Command claude.exe -ErrorAction SilentlyContinue
+    $claudeCmd = Get-Command claude.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($claudeCmd) {
         $claudeExe = $claudeCmd.Source
     } else {
-        $cmdFallback = Get-Command claude -ErrorAction SilentlyContinue
-        if ($cmdFallback) {
-            $claudeExe = $cmdFallback.Source
-        } else {
-            throw "Claude Code CLI ('claude') not found. Please install Claude Code and ensure it is in your PATH."
-        }
+        throw "Claude Code CLI executable (claude.exe) not found. Install Claude Code with the native installer (or a current npm package that ships claude.exe) and ensure it is in your PATH. .cmd/.ps1 wrappers are not used for safety."
     }
+}
+
+if ([System.IO.Path]::GetExtension($claudeExe) -ne ".exe") {
+    throw "Refusing to run non-.exe Claude Code launcher: $claudeExe"
 }
 
 $startTime = Get-Date
@@ -163,8 +174,11 @@ $resEntry = [ordered]@{
 Add-Content -Path $logFile -Value $resEntry -Encoding UTF8
 
 # Regenerate dashboard_data.js so dashboard.html works offline via file:// without CORS errors
-$allLines = Get-Content -Path $logFile -Encoding UTF8 | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-$jsPayload = "window.ORCHESTRATION_LOGS = [`n" + ($allLines -join ",`n") + "`n];"
+# The log is embedded as a single JSON string literal (never as raw code), and the dashboard parses it
+# line by line, so a tampered comm_log.jsonl cannot execute script in the browser.
+$rawLog = [System.IO.File]::ReadAllText($logFile, [System.Text.Encoding]::UTF8)
+$jsonLiteral = ConvertTo-Json -InputObject $rawLog -Compress
+$jsPayload = "window.ORCHESTRATION_LOGS_JSONL = $jsonLiteral;"
 Set-Content -Path $jsDataFile -Value $jsPayload -Encoding UTF8
 
 # Emit clean summary JSON to stdout for Antigravity Neon to parse

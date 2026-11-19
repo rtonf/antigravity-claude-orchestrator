@@ -40,7 +40,7 @@ Google Antigravity (**Gemini 4 Neon**) acts as the **Orchestrator (Lead Architec
 
 ### Phase 1: Intake & Workspace Setup
 1. Clarify the user's project overview, goals, and constraints.
-2. Create an `.orchestration/` directory in the project root (add `.orchestration/` to `.gitignore` if the user does not want local logs committed).
+2. Create an `.orchestration/` directory in the project root. The bridge script also creates `.orchestration/.gitignore` (containing `*`) so the full-text prompt/response logs are never committed by accident; only remove it if the user explicitly wants the logs in version control.
 3. Copy `resources/dashboard.html` from this skill directory into `<PROJECT_DIR>/.orchestration/dashboard.html` so the user can visually inspect all agent-to-agent conversations in a browser.
 4. Create/update an Antigravity Artifact named `orchestration-board.md` (`UserFacing: true`) to display the live task plan, worker assignments, and communication timeline inside the Antigravity GUI pane.
 
@@ -62,7 +62,7 @@ bash "$HOME/.gemini/config/skills/neon-claude-orchestrator/scripts/claude-bridge
 **Parameters:**
 - `Model` / `--model`: `claude-opus-5-5` (requires Claude Code CLI `2.1.280+`), `claude-sonnet-5-5`, or `default` (uses your CLI's current default model without hardcoding a version).
 - `Role` / `--role`: `implementer`, `reviewer`, `debugger`, or `architect`.
-- `-ReadOnly` / `--read-only`: Restricts Claude Code to read-only inspection tools (`Read,Grep,Glob,LS`) for safe code review or architecture consultation.
+- `-ReadOnly` / `--read-only`: Makes only the read-only built-in tools (`Read,Grep,Glob`) available via `--tools` and disables MCP servers (`--strict-mcp-config`), so Claude Code cannot edit files or run commands even if the user's settings would normally allow it. Use for safe code review or architecture consultation.
 - `-ResumeSessionId` / `--resume`: Pass the `session_id` returned by a previous call to continue the **same Claude Code conversation** for multi-turn bidirectional dialogue.
 
 ### Phase 3: Bidirectional Communication & Handoff

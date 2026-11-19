@@ -15,12 +15,13 @@ OAuth トークンの抜き出しや非公式プロキシハーネスを一切�
 * **サブスクリプション保護ブリッジ（`claude-bridge.ps1` / `claude-bridge.sh`）**
   * 未改変の公式 `claude` バイナリをローカルで直接呼び出します。
   * 実行時に `ANTHROPIC_API_KEY` を一時クリアし、意図しない従量課金 API へのフォールバックを防止します。
-  * `-ReadOnly` / `--read-only` オプションにより、書き込み不可の安全なクロスモデル・コードレビューが可能です。
+  * `-ReadOnly` / `--read-only` オプションにより、書き込み不可の安全なクロスモデル・コードレビューが可能です（使えるツールを `Read,Grep,Glob` だけに絞り、MCP サーバーも無効にするため、Claude Code 側の許可設定に関係なくファイルの変更やコマンドの実行はできません）。
 * **双方向・複数ターンのセッション継続**
   Claude Code が返す `session_id` を自動回収し、`--resume` で同一会話を継続できるため、Neon ↔ Claude Code 間での設計議論やテスト失敗の差し戻しがスムーズに行えます。
 * **GUI でのやり取り可視化**
   * Antigravity アプリ内の Artifacts パネルに `orchestration-board.md` を出力・更新します。
   * プロジェクト内の `.orchestration/dashboard.html` をブラウザで開くだけで、Neon（左）↔ Claude Code（右）のやり取り・モデル・応答時間・セッションIDをチャット画面風に確認できます（オフラインの `file://` でもそのまま動作）。
+  * ログにはプロンプトと返答が全文で残るため、ブリッジが `.orchestration/.gitignore`（中身は `*`）を作り、プロジェクトの git 履歴に入らないようにします。
 * **クロスプラットフォーム対応**
   Windows（PowerShell）と macOS / Linux（Bash）の両方に対応しています。
 
@@ -36,6 +37,7 @@ OAuth トークンの抜き出しや非公式プロキシハーネスを一切�
    claude auth login
    ```
    > **補足**: `claude-opus-5-5` を明示指定するには Claude Code CLI `2.1.280` 以上（`claude update`）が必要です。旧バージョンでは `-Model default` / `--model default` を指定してください。
+   > **Windows の場合**: ブリッジが起動するのは本物の `claude.exe`（ネイティブインストーラ版か、`claude.exe` を同梱した最近の npm 版）だけです。`.cmd` / `.ps1` のラッパーは、cmd.exe の引用規則のせいで細工したプロンプトからコマンドを注入されるおそれがあるため使いません。
 3. *(macOS / Linux のみ)* `python3` が利用可能であること
 
 ---

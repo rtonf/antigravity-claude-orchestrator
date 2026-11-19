@@ -43,6 +43,10 @@ unset ANTHROPIC_API_KEY
 
 ORCH_DIR="$PROJECT_DIR/.orchestration"
 mkdir -p "$ORCH_DIR"
+# Logs contain full prompts and replies: keep them out of the project's git history by default
+if [[ ! -e "$ORCH_DIR/.gitignore" ]]; then
+  printf '*\n' > "$ORCH_DIR/.gitignore"
+fi
 LOG_FILE="$ORCH_DIR/comm_log.jsonl"
 JS_DATA_FILE="$ORCH_DIR/dashboard_data.js"
 
@@ -54,7 +58,11 @@ if [[ -n "$RESUME_SESSION_ID" ]]; then
   CLI_ARGS+=(--resume "$RESUME_SESSION_ID")
 fi
 if [[ "$READ_ONLY" == "true" ]]; then
-  CLI_ARGS+=(--allowedTools "Read,Grep,Glob,LS")
+  # --tools limits which built-in tools exist at all (--allowedTools alone only pre-approves them,
+  # so user settings that allow Edit/Bash would still apply). --strict-mcp-config drops MCP servers,
+  # whose tools could also write.
+  READ_ONLY_TOOLS="Read,Grep,Glob"
+  CLI_ARGS+=(--tools "$READ_ONLY_TOOLS" --allowedTools "$READ_ONLY_TOOLS" --strict-mcp-config)
 fi
 
 # Use python3 for reliable UTF-8 JSON encoding/decoding and millisecond timing
@@ -130,11 +138,14 @@ res_entry = {
 with open(log_file, "a", encoding="utf-8") as f:
     f.write(json.dumps(res_entry, ensure_ascii=False) + "\n")
 
+# The log is embedded as a single JSON string literal (never as raw code), and the dashboard parses it
+# line by line, so a tampered comm_log.jsonl cannot execute script in the browser.
 with open(log_file, "r", encoding="utf-8") as f:
-    lines = [line.strip() for line in f if line.strip()]
+    raw_log = f.read()
 
+js_literal = json.dumps(raw_log).replace("<", "\\u003c")
 with open(js_data_file, "w", encoding="utf-8") as f:
-    f.write("window.ORCHESTRATION_LOGS = [\n" + ",\n".join(lines) + "\n];\n")
+    f.write("window.ORCHESTRATION_LOGS_JSONL = " + js_literal + ";\n")
 
 summary = {
     "status": "ok" if proc.returncode == 0 else "error",
