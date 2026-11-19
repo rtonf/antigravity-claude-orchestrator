@@ -14,11 +14,12 @@ Designed to stay **compliant with official consumer subscriptions** (Google AI P
 - **Subscription-Safe Bridge (`claude-bridge.ps1` / `claude-bridge.sh`)**:
   - Invokes your unmodified local `claude` CLI binary directly.
   - Automatically unsets `ANTHROPIC_API_KEY` during execution to prevent accidental fallback to pay-as-you-go Console API billing.
-  - Supports `--read-only` / `-ReadOnly` mode for safe cross-model code reviews.
+  - Supports `--read-only` / `-ReadOnly` mode for safe cross-model code reviews (only `Read,Grep,Glob` are made available and MCP servers are disabled, regardless of your Claude Code permission settings).
 - **Bidirectional Multi-Turn Dialogue**: Captures and reuses Claude Code `session_id` (`--resume`) so Neon and Claude Code can iterate across multiple turns in the same conversation context.
 - **Visual GUI Monitoring**:
   - Updates an Antigravity Artifact (`orchestration-board.md`) inside the Antigravity GUI pane.
   - Automatically logs every message to `.orchestration/comm_log.jsonl` and generates `.orchestration/dashboard_data.js` so you can open `.orchestration/dashboard.html` directly in your browser (works offline via `file://`).
+  - The logs contain full prompts and replies, so the bridge writes `.orchestration/.gitignore` (`*`) to keep them out of your project's git history.
 - **Cross-Platform**: Includes both Windows PowerShell (`claude-bridge.ps1`) and macOS/Linux Bash (`claude-bridge.sh`) bridges.
 
 ---
@@ -33,6 +34,7 @@ Designed to stay **compliant with official consumer subscriptions** (Google AI P
    claude auth login
    ```
    > **Note:** Using `claude-opus-5-5` requires Claude Code CLI `2.1.280+` (`claude update`). If you are on an older version, pass `-Model default` / `--model default`.
+   > **Windows:** the bridge only runs a real `claude.exe` (native installer or a current npm package). `.cmd` / `.ps1` wrappers are refused because cmd.exe quoting could let a crafted prompt inject shell commands.
 3. *(macOS / Linux only)* `python3` available in `PATH` (used by `claude-bridge.sh` for UTF-8 JSON handling).
 
 ---
